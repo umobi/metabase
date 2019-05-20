@@ -30,7 +30,8 @@
              [interface :as tx]]
             [metabase.test.util.timezone :as tu.tz]
             [metabase.util.date :as du])
-  (:import org.joda.time.DateTime))
+  (:import metabase.test.data.interface.IDatasetDefinition
+           org.joda.time.DateTime))
 
 (defn- ->long-if-number [x]
   (if (number? x)
@@ -788,23 +789,24 @@
 
 ;; RELATIVE DATES
 (defn- database-def-with-timestamps [interval-seconds]
-  (tx/create-database-definition (str "a-checkin-every-" interval-seconds "-seconds")
-    ["checkins"
-     [{:field-name "timestamp"
-       :base-type  :type/DateTime}]
-     (vec (for [i (range -15 15)]
-            ;; Create timestamps using relative dates (e.g. `DATEADD(second, -195, GETUTCDATE())` instead of
-            ;; generating `java.sql.Timestamps` here so they'll be in the DB's native timezone. Some DBs refuse to use
-            ;; the same timezone we're running the tests from *cough* SQL Server *cough*
-            [(u/prog1 (driver/date-interval driver/*driver* :second (* i interval-seconds))
-               (assert <>))]))]))
+  (reify IDatasetDefinition
+    (get-dataset-definition [_]
+      ["checkins"
+       [{:field-name "timestamp"
+         :base-type  :type/DateTime}]
+       (vec (for [i (range -15 15)]
+              ;; Create timestamps using relative dates (e.g. `DATEADD(second, -195, GETUTCDATE())` instead of
+              ;; generating `java.sql.Timestamps` here so they'll be in the DB's native timezone. Some DBs refuse to use
+              ;; the same timezone we're running the tests from *cough* SQL Server *cough*
+              [(u/prog1 (driver/date-interval driver/*driver* :second (* i interval-seconds))
+                 (assert <>))]))])))
 
-(def ^:private checkins:4-per-minute (partial database-def-with-timestamps 15))
-(def ^:private checkins:4-per-hour   (partial database-def-with-timestamps (* 60 15)))
-(def ^:private checkins:1-per-day    (partial database-def-with-timestamps (* 60 60 24)))
+(def ^:private checkins:4-per-minute (database-def-with-timestamps 15))
+(def ^:private checkins:4-per-hour   (database-def-with-timestamps (* 60 15)))
+(def ^:private checkins:1-per-day    (database-def-with-timestamps (* 60 60 24)))
 
-(defn- count-of-grouping [db field-grouping & relative-datetime-args]
-  (-> (data/with-temp-db [_ db]
+(defn- count-of-grouping [dataset field-grouping & relative-datetime-args]
+  (-> (data/with-temp-db [_ dataset]
         (data/run-mbql-query checkins
           {:aggregation [[:count]]
            :filter      [:=
@@ -818,25 +820,25 @@
 ;; Don't run the minute tests against Oracle because the Oracle tests are kind of slow and case CI to fail randomly
 ;; when it takes so long to load the data that the times are no longer current (these tests pass locally if your
 ;; machine isn't as slow as the CircleCI ones)
-(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery :oracle} 4 (count-of-grouping (checkins:4-per-minute) :minute "current"))
+(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery :oracle} 4 (count-of-grouping checkins:4-per-minute :minute "current"))
 
-(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery :oracle} 4 (count-of-grouping (checkins:4-per-minute) :minute -1 "minute"))
-(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery :oracle} 4 (count-of-grouping (checkins:4-per-minute) :minute  1 "minute"))
+(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery :oracle} 4 (count-of-grouping checkins:4-per-minute :minute -1 "minute"))
+(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery :oracle} 4 (count-of-grouping checkins:4-per-minute :minute  1 "minute"))
 
-(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 4 (count-of-grouping (checkins:4-per-hour) :hour "current"))
-(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 4 (count-of-grouping (checkins:4-per-hour) :hour -1 "hour"))
-(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 4 (count-of-grouping (checkins:4-per-hour) :hour  1 "hour"))
+(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 4 (count-of-grouping checkins:4-per-hour :hour "current"))
+(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 4 (count-of-grouping checkins:4-per-hour :hour -1 "hour"))
+(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 4 (count-of-grouping checkins:4-per-hour :hour  1 "hour"))
 
-(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 1 (count-of-grouping (checkins:1-per-day) :day "current"))
-(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 1 (count-of-grouping (checkins:1-per-day) :day -1 "day"))
-(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 1 (count-of-grouping (checkins:1-per-day) :day  1 "day"))
+(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 1 (count-of-grouping checkins:1-per-day :day "current"))
+(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 1 (count-of-grouping checkins:1-per-day :day -1 "day"))
+(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 1 (count-of-grouping checkins:1-per-day :day  1 "day"))
 
-(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 7 (count-of-grouping (checkins:1-per-day) :week "current"))
+(expect-with-non-timeseries-dbs-except #{:snowflake :bigquery} 7 (count-of-grouping checkins:1-per-day :week "current"))
 
 ;; SYNTACTIC SUGAR
 (expect-with-non-timeseries-dbs-except #{:snowflake :bigquery}
   1
-  (-> (data/with-temp-db [_ (checkins:1-per-day)]
+  (-> (data/with-temp-db [_ checkins:1-per-day]
         (data/run-mbql-query checkins
           {:aggregation [[:count]]
            :filter      [:time-interval $timestamp :current :day]}))
@@ -844,7 +846,7 @@
 
 (expect-with-non-timeseries-dbs-except #{:snowflake :bigquery}
   7
-  (-> (data/with-temp-db [_ (checkins:1-per-day)]
+  (-> (data/with-temp-db [_ checkins:1-per-day]
         (data/run-mbql-query checkins
           {:aggregation [[:count]]
            :filter      [:time-interval $timestamp :last :week]}))
@@ -855,7 +857,7 @@
 ;; and the col info use the unit used by breakout
 (defn- date-bucketing-unit-when-you [& {:keys [breakout-by filter-by with-interval]
                                         :or   {with-interval :current}}]
-  (let [results (data/with-temp-db [_ (checkins:1-per-day)]
+  (let [results (data/with-temp-db [_ checkins:1-per-day]
                   (data/run-mbql-query checkins
                     {:aggregation [[:count]]
                      :breakout    [[:datetime-field $timestamp breakout-by]]
@@ -908,7 +910,7 @@
   [[1]]
   (format-rows-by [int]
     (rows
-      (data/with-temp-db [_ (checkins:1-per-day)]
+      (data/with-temp-db [_ checkins:1-per-day]
         (data/run-mbql-query checkins
           {:aggregation [[:count]]
            :filter      [:= [:field-id $timestamp] (du/format-date "yyyy-MM-dd" (du/date-trunc :day))]})))))
@@ -944,7 +946,7 @@
     [[0]])
   (format-rows-by [int]
     (rows
-      (data/with-temp-db [_ (checkins:1-per-day)]
+      (data/with-temp-db [_ checkins:1-per-day]
         (data/run-mbql-query checkins
           {:aggregation [[:count]]
            :filter      [:= [:field-id $timestamp] (str (du/format-date "yyyy-MM-dd" (du/date-trunc :day))

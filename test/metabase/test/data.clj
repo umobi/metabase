@@ -57,7 +57,7 @@
             [metabase.test.util.timezone :as tu.tz]
             [toucan.db :as db])
   (:import clojure.lang.Keyword
-           [metabase.test.data.interface DatabaseDefinition TableDefinition]))
+           [metabase.test.data.interface DatabaseDefinition IDatasetDefinition TableDefinition]))
 
 (declare get-or-create-database!)
 
@@ -385,8 +385,8 @@
 (defn do-with-temp-db
   "Execute `f` with `dbdef` loaded as the current dataset. `f` takes a single argument, the DatabaseInstance that was
   loaded and synced from `dbdef`."
-  [^DatabaseDefinition dbdef, f]
-  (let [dbdef  (tx/map->DatabaseDefinition dbdef)]
+  [^IDatasetDefinition dataset-definition, f]
+  (let [dbdef (tx/get-dataset-definition dataset-definition)]
     (binding [db/*disable-db-logging* true]
       (let [db (get-or-create-database! (tx/driver) dbdef)]
         (assert db)
@@ -408,8 +408,8 @@
 
   A given Database is only created once per run of the test suite, and is automatically destroyed at the conclusion
   of the suite."
-  [[db-binding, ^DatabaseDefinition database-definition] & body]
-  `(do-with-temp-db ~database-definition
+  [[db-binding, ^IDatasetDefinition dataset-def] & body]
+  `(do-with-temp-db ~dataset-def
      (fn [~db-binding]
        ~@body)))
 

@@ -21,7 +21,7 @@
     (set (map (partial into {}) (db/select ['Field :name :description] :table_id [:in table-ids])))))
 
 ;; test basic field comments sync
-(tx/def-database-definition ^:const ^:private basic-field-comments
+(tx/defdataset ^:private basic-field-comments
   [["basic_field_comments"
     [{:field-name "with_comment", :base-type :type/Text, :field-comment "comment"}
      {:field-name "no_comment", :base-type :type/Text}]
@@ -35,7 +35,7 @@
     (db->fields db)))
 
 ;; test changing the description in metabase db so we can check it is not overwritten by comment in source db when resyncing
-(tx/def-database-definition ^:const ^:private update-desc
+(tx/defdataset ^:private update-desc
   [["update_desc"
     [{:field-name "updated_desc", :base-type :type/Text, :field-comment "original comment"}]
     [["foo"]]]])
@@ -51,7 +51,7 @@
     (db->fields db)))
 
 ;; test adding a comment to the source data that was initially empty, so we can check that the resync picks it up
-(tx/def-database-definition ^:const ^:private comment-after-sync
+(tx/defdataset ^:private comment-after-sync
   [["comment_after_sync"
     [{:field-name "comment_after_sync", :base-type :type/Text}]
     [["foo"]]]])

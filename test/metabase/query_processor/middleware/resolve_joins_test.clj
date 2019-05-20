@@ -8,3 +8,5 @@
   (#'resolve-joins/resolve-joins* {}))
 
 ;; TODO - Does joining the same table twice without an explicit alias give both joins unique aliases?
+
+;; TODO Should throw an Exception if a Joined Field using an alias that doesn't exist is used
