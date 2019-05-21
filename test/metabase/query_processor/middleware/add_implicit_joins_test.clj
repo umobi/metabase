@@ -111,3 +111,7 @@
       :aggregation  [[:count]]
       :breakout     [$venue_id->venues.price]
       :order-by     [[:asc $venue_id->venues.price]]})))
+
+;; TODO - test that it stores joined tables in QP store
+
+;; TODO - test that joining against a table in a different DB throws and Exception

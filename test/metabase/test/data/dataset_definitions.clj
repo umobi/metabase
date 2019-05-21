@@ -1,5 +1,5 @@
 (ns metabase.test.data.dataset-definitions
-  "Definitions of various datasets for use in tests with `with-temp-db`."
+  "Definitions of various datasets for use in tests with `data/dataset` or `data/with-db-for-dataset`."
   (:require [medley.core :as m]
             [metabase.test.data.interface :as tx])
   (:import java.sql.Time
@@ -12,8 +12,8 @@
 (tx/defdataset-edn test-data
   "The O.G. \"Test Database\" dataset.")
 
-(tx/defdataset-edn sad-toucan-incidents
-  "Times when the Toucan cried")
+ (tx/defdataset-edn sad-toucan-incidents
+   "Times when the Toucan cried")
 
 (tx/defdataset-edn tupac-sightings
   "Places, times, and circumstances where Tupac was sighted. Sighting timestamps are UNIX Timestamps in seconds")
@@ -44,11 +44,12 @@
   not explicitly marked as a foreign key, because the test dataset syntax does not yet have a way to support nullable
   foreign keys.)")
 
+
 (defn- calendar-with-fields ^Calendar [date & fields]
-  (let [cal-from-date  (doto (Calendar/getInstance (TimeZone/getTimeZone "UTC"))
-                         (.setTime date))
-        blank-calendar (doto (.clone cal-from-date)
-                         .clear)]
+  (let [^Calendar cal-from-date  (doto (Calendar/getInstance (TimeZone/getTimeZone "UTC"))
+                                   (.setTime date))
+        ^Calendar blank-calendar (doto ^Calendar (.clone cal-from-date)
+                                   .clear)]
     (doseq [field fields]
       (.set blank-calendar field (.get cal-from-date field)))
     blank-calendar))
@@ -66,10 +67,11 @@
   [date]
   (Time. (.getTimeInMillis (calendar-with-fields date Calendar/HOUR_OF_DAY Calendar/MINUTE Calendar/SECOND))))
 
-(def test-data-with-time
-  "The main `test-data` dataset, but only the `users` table, and with `last_login_date` and `last_login_time` instead of
-  `last_login`."
-  (tx/transformed-dataset-definition test-data
+
+(defonce ^{:doc "The main `test-data` dataset, but only the `users` table, and with `last_login_date` and
+  `last_login_time` instead of `last_login`."}
+  test-data-with-time
+  (tx/transformed-dataset-definition "test-data-with-time" test-data
     (tx/transform-dataset-only-tables "users")
     (tx/transform-dataset-update-table "users"
       :table
@@ -87,11 +89,9 @@
         (for [[username last-login password-text] rows]
           [username (date-only last-login) (time-only last-login) password-text])))))
 
-(def test-data-with-null-date-checkins
-  "The main `test-data` dataset, but only the `checkins` table, and with an additional (all-null) `null_only_date`
-  Field."
-  (tx/transformed-dataset-definition test-data
-    (tx/transform-dataset-only-tables "checkins")
+(defonce ^{:doc "The main `test-data` dataset, with an additional (all-null) `null_only_date` Field."}
+  test-data-with-null-date-checkins
+  (tx/transformed-dataset-definition "test-data-with-null-date-checkins" test-data
     (tx/transform-dataset-update-table "checkins"
       :table
       (fn [tabledef]
@@ -105,9 +105,9 @@
         (for [row rows]
           (concat row [nil]))))))
 
-(def test-data-with-timezones
-  "The main `test-data` dataset, but `last_login` has a base type of `:type/DateTimeWithTZ`."
-  (tx/transformed-dataset-definition test-data
+(defonce ^{:doc "The main `test-data` dataset, but `last_login` has a base type of `:type/DateTimeWithTZ`."}
+  test-data-with-timezones
+  (tx/transformed-dataset-definition "test-data-with-timezones" test-data
     (tx/transform-dataset-update-table "users"
       :table
       (fn [tabledef]
@@ -119,27 +119,10 @@
             (tx/map->FieldDefinition {:field-name "last_login", :base-type :type/DateTimeWithTZ})
             password-field-def]))))))
 
-(def test-data-map
-  "Converts data from `test-data` to a map of maps like the following:
-
-   {<table-name> [{<field-name> <field value> ...}]."
-  (reduce (fn [acc {:keys [table-name field-definitions rows]}]
-            (let [field-names (mapv :field-name field-definitions)]
-              (assoc acc table-name
-                     (for [row rows]
-                       (zipmap field-names row)))))
-          {} (:table-definitions test-data)))
-
-(defn field-values
-  "Returns the field values for the given `table` and `column` found
-  in the data-map `M`."
-  [m table column]
-  (mapv #(get % column) (get m table)))
-
-(def test-data-self-referencing-user
-  "The usual `test-data` dataset, but only the `users` table; adds a `created_by` column to the users table that is self
-  referencing."
-  (tx/transformed-dataset-definition test-data
+(defonce ^{:doc "The usual `test-data` dataset, but only the `users` table; adds a `created_by` column to the users
+  table that is self referencing."}
+  test-data-self-referencing-user
+  (tx/transformed-dataset-definition "test-data-self-referencing-user" test-data
     (tx/transform-dataset-only-tables "users")
     (tx/transform-dataset-update-table "users"
       :table

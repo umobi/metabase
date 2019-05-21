@@ -26,13 +26,14 @@
   ([dbdef]
    (data/get-or-create-database! :h2 dbdef))
 
-  ([driver {:keys [database-name], :as dbdef}]
-   ;; don't think we need to bother making this super-threadsafe because REPL usage and tests are more or less
-   ;; single-threaded
-   (when (not (contains? @h2-test-dbs-created-by-this-instance database-name))
-     (db/delete! Database :engine "h2", :name database-name)
-     (swap! h2-test-dbs-created-by-this-instance conj database-name))
-   ((get-method data/get-or-create-database! :default) driver dbdef)))
+  ([driver dbdef]
+   (let [{:keys [database-name], :as dbdef} (tx/get-dataset-definition dbdef)]
+     ;; don't think we need to bother making this super-threadsafe because REPL usage and tests are more or less
+     ;; single-threaded
+     (when (not (contains? @h2-test-dbs-created-by-this-instance database-name))
+       (db/delete! Database :engine "h2", :name database-name)
+       (swap! h2-test-dbs-created-by-this-instance conj database-name))
+     ((get-method data/get-or-create-database! :default) driver dbdef))))
 
 (defmethod sql.tx/field-base-type->sql-type [:h2 :type/BigInteger] [_ _] "BIGINT")
 (defmethod sql.tx/field-base-type->sql-type [:h2 :type/Boolean]    [_ _] "BOOL")

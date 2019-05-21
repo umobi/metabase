@@ -290,7 +290,6 @@
 
 ;;; ----------------------------------------------------- joins ------------------------------------------------------
 
-;; NOCOMMIT
 ;; do entries in the `:joins` clause get normalized?
 (expect
   {:database 4
@@ -320,7 +319,7 @@
    {:database 4
     :type     :query
     :query    {"source_table" 1
-               "joins"        [{"fields" [["field_id 1"] ["field_literal" :MY_FIELD "type/Integer"]]}]}}))
+               "joins"        [{"fields" [["field_id" 1] ["field_literal" :MY_FIELD "type/Integer"]]}]}}))
 
 ;; does `:source-query` in `:joins` get normalized?
 (expect
@@ -335,7 +334,7 @@
     :type     :query
     :query    {:source-table 1
                :joins        [{"source_query" {"source_table" 2}
-                               "fields"       [["field_id 1"]
+                               "fields"       [["field_id" 1]
                                                ["field_literal" :MY_FIELD "type/Integer"]]}]}}))
 
 ;; do `:joins` inside a nested query get normalized?
@@ -351,7 +350,7 @@
     :type     :query
     :query    {"source_query" {"source_table" 1
                                "joins"        [{"strategy" "right-join"
-                                                "fields"   [["field_id 1"] ["field_literal" :MY_FIELD "type/Integer"]]}]}}}))
+                                                "fields"   [["field_id" 1] ["field_literal" :MY_FIELD "type/Integer"]]}]}}}))
 
 
 ;;; ----------------------------------------------------- other ------------------------------------------------------

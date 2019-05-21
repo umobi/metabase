@@ -140,7 +140,7 @@
   (let [clause-name (mbql.u/normalize-token clause-name)]
     (if-let [f (mbql-clause->special-token-normalization-fn clause-name)]
       (apply f clause-name args)
-      (vec (cons clause-name (map #(normalize-tokens % :ignore-path) args))))))
+      (into [clause-name] (map #(normalize-tokens % :ignore-path) args)))))
 
 
 (defn- aggregation-subclause? [x]
@@ -213,7 +213,7 @@
 
 (defn- normalize-join [join]
   ;; path in call to `normalize-tokens` is [:query] so it will normalize `:source-query` as appropriate
-  (let [{:keys [strategy fields alias], :as join} (normalize-tokens join [:query])]
+  (let [{:keys [strategy fields alias], :as join} (normalize-tokens join :query)]
     (cond-> join
       strategy
       (update :strategy mbql.u/normalize-token)

@@ -20,15 +20,15 @@
   []
   (doseq [driver event-based-dbs]
     (datasets/with-driver-when-testing driver
-      (data/do-with-temp-db flattened-db-def (constantly nil)))))
+      (data/do-with-db-for-dataset flattened-db-def (constantly nil)))))
 
 (defn do-with-flattened-dbdef
-  "Execute F with a flattened version of the test data DB as the current DB def."
+  "Execute `f` with a flattened version of the test data DB as the current DB def."
   [f]
-  (data/do-with-temp-db flattened-db-def (u/drop-first-arg f)))
+  (data/do-with-db-for-dataset flattened-db-def (fn [_] (f))))
 
 (defmacro with-flattened-dbdef
-  "Execute BODY using the flattened test data DB definition."
+  "Execute `body` using the flattened test data DB definition."
   [& body]
   `(do-with-flattened-dbdef (fn [] ~@body)))
 

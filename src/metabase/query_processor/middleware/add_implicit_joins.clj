@@ -3,7 +3,8 @@
   with `:joined-field` clauses."
   (:require [metabase
              [db :as mdb]
-             [driver :as driver]]
+             [driver :as driver]
+             [util :as u]]
             [metabase.mbql
              [schema :as mbql.s]
              [util :as mbql.u]]
@@ -64,7 +65,9 @@
 (s/defn ^:private store-join-tables! [fk-clauses :- [FKClauseWithFieldIDArgs]]
   (let [table-ids-to-fetch (fks->dest-table-ids fk-clauses)]
     (when (seq table-ids-to-fetch)
-      (doseq [table (db/select (vec (cons Table qp.store/table-columns-to-fetch)), :id [:in table-ids-to-fetch])]
+      (doseq [table (db/select (into [Table] qp.store/table-columns-to-fetch)
+                      :db_id (u/get-id (qp.store/database))
+                      :id    [:in table-ids-to-fetch])]
         (qp.store/store-table! table)))))
 
 

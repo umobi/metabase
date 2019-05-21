@@ -107,7 +107,7 @@
    :native_form true}
   (data/with-data
     (fn []
-      (let [venue-names (defs/field-values defs/test-data-map "categories" "name")]
+      (let [venue-names (data/dataset-field-values "categories" "name")]
         [(db/insert! Dimension {:field_id (data/id :venues :category_id)
                                 :name     "Foo"
                                 :type     :internal})

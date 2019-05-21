@@ -55,9 +55,9 @@
              [dataset-definitions :as defs]
              [interface :as tx]]
             [metabase.test.util.timezone :as tu.tz]
+            [schema.core :as s]
             [toucan.db :as db])
-  (:import clojure.lang.Keyword
-           [metabase.test.data.interface DatabaseDefinition IDatasetDefinition TableDefinition]))
+  (:import [metabase.test.data.interface DatabaseDefinition TableDefinition]))
 
 (declare get-or-create-database!)
 
@@ -89,8 +89,7 @@
     (f)))
 
 (defmacro with-db
-  "Run body with DB as the current database.
-   Calls to `db` and `id` use this value."
+  "Run body with `db` as the current database. Calls to `db` and `id` use this value."
   [db & body]
   `(do-with-db ~db (fn [] ~@body)))
 
@@ -359,7 +358,7 @@
 
 (defmulti get-or-create-database!
   "Create DBMS database associated with `database-definition`, create corresponding Metabase Databases/Tables/Fields,
-  and sync the `Database`. `driver` is a keyword name of a driver that implements test extension methods (as defined
+  and sync the Database. `driver` is a keyword name of a driver that implements test extension methods (as defined
   in the `metabase.test.data.interface` namespace); `driver` defaults to `driver/*driver*` if bound, or `:h2` if not."
   {:arglists '([^DatabaseDefinition dbef] [driver, ^DatabaseDefinition dbdef])}
   (fn
@@ -374,18 +373,19 @@
    (get-or-create-database! (tx/driver) dbdef))
 
   ([driver dbdef]
-   (or
-    (tx/metabase-instance dbdef driver)
-    (locking (driver->create-database-lock driver)
-      (or
-       (tx/metabase-instance dbdef driver)
-       (create-database! driver dbdef))))))
+   (let [dbdef (tx/get-dataset-definition dbdef)]
+     (or
+      (tx/metabase-instance dbdef driver)
+      (locking (driver->create-database-lock driver)
+        (or
+         (tx/metabase-instance dbdef driver)
+         (create-database! driver dbdef)))))))
 
 
-(defn do-with-temp-db
+(s/defn do-with-db-for-dataset
   "Execute `f` with `dbdef` loaded as the current dataset. `f` takes a single argument, the DatabaseInstance that was
   loaded and synced from `dbdef`."
-  [^IDatasetDefinition dataset-definition, f]
+  [dataset-definition, f :- (s/pred fn?)]
   (let [dbdef (tx/get-dataset-definition dataset-definition)]
     (binding [db/*disable-db-logging* true]
       (let [db (get-or-create-database! (tx/driver) dbdef)]
@@ -395,11 +395,11 @@
           (f db))))))
 
 
-(defmacro with-temp-db
-  "Load and sync `database-definition` with `driver` and execute `body` with the newly created `Database` bound to
+(defmacro with-db-for-dataset
+  "Load and sync `database-definition` with `driver` and execute `body` with the newly created Database bound to
   `db-binding`, and make it the current database for `metabase.test.data` functions like `id`.
 
-     (with-temp-db [db tupac-sightings]
+     (with-db-for-dataset [db tupac-sightings]
        (driver/process-quiery {:database (:id db)
                                :type     :query
                                :query    {:source-table (:id &events)
@@ -408,29 +408,29 @@
 
   A given Database is only created once per run of the test suite, and is automatically destroyed at the conclusion
   of the suite."
-  [[db-binding, ^IDatasetDefinition dataset-def] & body]
-  `(do-with-temp-db ~dataset-def
+  [[db-binding dataset-def] & body]
+  `(do-with-db-for-dataset ~dataset-def
      (fn [~db-binding]
        ~@body)))
 
-(defn resolve-dbdef [symb]
-  @(or (resolve symb)
+(defn resolve-dbdef [namespace-symb symb]
+  @(or (ns-resolve namespace-symb symb)
        (ns-resolve 'metabase.test.data.dataset-definitions symb)
-       (throw (Exception. (format "Dataset definition not found: '%s' or 'metabase.test.data.dataset-definitions/%s'"
-                                  symb symb)))))
+       (throw (Exception. (format "Dataset definition not found: '%s/%s' or 'metabase.test.data.dataset-definitions/%s'"
+                                  namespace-symb symb symb)))))
 
 (defmacro dataset
-  "Load and sync a temporary `Database` defined by DATASET, make it the current DB (for `metabase.test.data` functions
-  like `id`), and execute `body`.
+  "Load and sync a temporary Database defined by `dataset`, make it the current DB (for `metabase.test.data` functions
+  like `id` and `db`), and execute `body`.
 
-  Like `with-temp-db`, but takes an unquoted symbol naming a `DatabaseDefinition` rather than the dbef itself.
-  DATASET is optionally namespace-qualified; if not, `metabase.test.data.dataset-definitions` is assumed.
+  Like `with-db-for-dataset`, but takes an unquoted symbol naming a DatabaseDefinition rather than the dbef itself. `dataset`
+  is optionally namespace-qualified; if not, `metabase.test.data.dataset-definitions` is assumed.
 
      (dataset sad-toucan-incidents
        ...)"
   {:style/indent 1}
   [dataset & body]
-  `(with-temp-db [~'_ (resolve-dbdef '~dataset)]
+  `(with-db-for-dataset [~'_ (resolve-dbdef '~(ns-name *ns*) '~dataset)]
      ~@body))
 
 (defn- delete-model-instance!
@@ -449,30 +449,51 @@
         (doseq [instance result-instances]
           (delete-model-instance! instance))))))
 
-(defmacro with-data [data-load-fn & body]
+(defmacro with-data
+  "Calls `data-load-fn` to create a sequence of objects, then runs `body`; finally, deletes the objects."
+  [data-load-fn & body]
   `(call-with-data ~data-load-fn (fn [] ~@body)))
 
-(def ^:private venue-categories
-  (map vector (defs/field-values defs/test-data-map "categories" "name")))
+(defn dataset-field-values
+  "Get all the values for a field in a `dataset-definition`.
 
+    (dataset-field-values \"categories\" \"name\") ; -> [\"African\" \"American\" \"Artisan\" ...]"
+  ([table-name field-name]
+   (dataset-field-values defs/test-data table-name field-name))
+
+  ([dataset-definition table-name field-name]
+   (some
+    (fn [{:keys [field-definitions rows], :as tabledef}]
+      (when (= table-name (:table-name tabledef))
+        (some
+         (fn [[i fielddef]]
+           (when (= field-name (:field-name fielddef))
+             (map #(nth % i) rows)))
+         (m/indexed field-definitions))))
+    (:table-definitions (tx/get-dataset-definition dataset-definition)))))
+
+(def ^:private category-names
+  (delay (vec (dataset-field-values "categories" "name"))))
+
+;; TODO - you should always call these functions with the `with-data` macro. We should enforce this
 (defn create-venue-category-remapping
   "Returns a thunk that adds an internal remapping for category_id in the venues table aliased as `remapping-name`.
   Can be used in a `with-data` invocation."
   [remapping-name]
   (fn []
     [(db/insert! Dimension {:field_id (id :venues :category_id)
-                            :name remapping-name
-                            :type :internal})
-     (db/insert! FieldValues {:field_id (id :venues :category_id)
-                              :values (json/generate-string (range 0 (count venue-categories)))
-                              :human_readable_values (json/generate-string (map first venue-categories))})]))
+                            :name     remapping-name
+                            :type     :internal})
+     (db/insert! FieldValues {:field_id              (id :venues :category_id)
+                              :values                (json/generate-string (range 1 (inc (count @category-names))))
+                              :human_readable_values (json/generate-string @category-names)})]))
 
 (defn create-venue-category-fk-remapping
   "Returns a thunk that adds a FK remapping for category_id in the venues table aliased as `remapping-name`. Can be
   used in a `with-data` invocation."
   [remapping-name]
   (fn []
-    [(db/insert! Dimension {:field_id (id :venues :category_id)
-                            :name remapping-name
-                            :type :external
+    [(db/insert! Dimension {:field_id                (id :venues :category_id)
+                            :name                    remapping-name
+                            :type                    :external
                             :human_readable_field_id (id :categories :name)})]))

@@ -535,7 +535,6 @@
   "Schema for a valid value for the `:source-table` clause of an MBQL query."
   (s/cond-pre su/IntGreaterThanZero source-table-card-id-regex))
 
-
 (def JoinStrategy
   "Strategy that should be used to perform the equivalent of a SQL `JOIN` against another table or a nested query.
   These correspond 1:1 to features of the same name in driver features lists; e.g. you should check that the current
@@ -622,7 +621,7 @@
     (s/optional-key :breakout)     (su/non-empty [Field])
     ;; TODO - expressions keys should be strings; fix this when we get a chance
     (s/optional-key :expressions)  {s/Keyword FieldOrExpressionDef}
-    (s/optional-key :fields)       (su/distinct (su/non-empty [Field]))
+    (s/optional-key :fields)       (su/distinct (su/non-empty [joined-field]))
     (s/optional-key :filter)       Filter
     (s/optional-key :limit)        su/IntGreaterThanZero
     (s/optional-key :order-by)     (su/distinct (su/non-empty [OrderBy]))

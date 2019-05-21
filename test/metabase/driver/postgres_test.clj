@@ -64,7 +64,7 @@
 ;; Verify that we identify JSON columns and mark metadata properly during sync
 (datasets/expect-with-driver :postgres
   :type/SerializedJSON
-  (data/with-temp-db
+  (data/with-db-for-dataset
     [_
      (tx/dataset-definition "Postgres with a JSON Field"
        ["venues"

@@ -8,6 +8,7 @@
   (:require [clojure.string :as str]
             [clojure.tools.reader.edn :as edn]
             [environ.core :refer [env]]
+            [medley.core :as m]
             [metabase
              [db :as db]
              [driver :as driver]
@@ -20,14 +21,20 @@
             [metabase.test.data.env :as tx.env]
             [metabase.util
              [date :as du]
+             [pretty :as pretty]
              [schema :as su]]
-            [schema.core :as s]
-            [medley.core :as m])
+            [schema.core :as s])
   (:import clojure.lang.Keyword))
 
 ;;; +----------------------------------------------------------------------------------------------------------------+
-;;; |                                        Dataset Definition Record Types                                         |
+;;; |                                   Dataset Definition Record Types & Protocol                                   |
 ;;; +----------------------------------------------------------------------------------------------------------------+
+
+(defmulti get-dataset-definition
+  "Return a definition of a dataset, so a test database can be created from it."
+  {:arglists '([this])}
+  class)
+
 
 (s/defrecord FieldDefinition [field-name      :- su/NonBlankString
                               base-type       :- (s/cond-pre {:native su/NonBlankString}
@@ -51,13 +58,7 @@
   nil
   :load-ns true)
 
-(defprotocol IDatasetDefinition
-  (get-dataset-definition [this]
-    "Return a definition of a dataset, so a test database can be created from it."))
-
-(extend-protocol IDatasetDefinition
-  DatabaseDefinition
-  (get-dataset-definition [this] this))
+(defmethod get-dataset-definition DatabaseDefinition [this] this)
 
 
 ;;; +----------------------------------------------------------------------------------------------------------------+
@@ -377,10 +378,6 @@
    (s/one [DatasetFieldDefinition] "fields")
    (s/one [[s/Any]] "rows")])
 
-(def ^:private DatasetDefinition
-  "Schema for a test dataset defined by a `defdataset` form or in a dataset defnition EDN file."
-  (s/named [DatasetTableDefinition] "tables"))
-
 ;; TODO - not sure everything below belongs in this namespace
 
 (s/defn ^:private dataset-field-definition :- FieldDefinition
@@ -396,20 +393,24 @@
    (apply dataset-table-definition tabledef))
 
   ([table-name :- su/NonBlankString, field-definition-maps, rows]
-   (s/validate TableDefinition (map->TableDefinition
-                                {:table-name        table-name
-                                 :rows              rows
-                                 :field-definitions (mapv dataset-field-definition field-definition-maps)}))))
+   (s/validate
+    TableDefinition
+    (map->TableDefinition
+     {:table-name        table-name
+      :rows              rows
+      :field-definitions (mapv dataset-field-definition field-definition-maps)}))))
 
 (s/defn dataset-definition :- DatabaseDefinition
   "Parse a dataset definition (from a `defdatset` form or EDN file) and return a DatabaseDefinition instance for
   comsumption by various test-data-loading methods."
   {:style/indent 1}
   [database-name :- su/NonBlankString, & definition]
-  (s/validate DatabaseDefinition (map->DatabaseDefinition
-                                  {:database-name     database-name
-                                   :table-definitions (for [table definition]
-                                                        (dataset-table-definition table))})))
+  (s/validate
+   DatabaseDefinition
+   (map->DatabaseDefinition
+    {:database-name     database-name
+     :table-definitions (for [table definition]
+                          (dataset-table-definition table))})))
 
 (defmacro defdataset
   "Define a new dataset to test against."
@@ -418,7 +419,7 @@
 
   ([dataset-name docstring definition]
    {:pre [(symbol? dataset-name)]}
-   `(def ~(vary-meta dataset-name assoc :doc docstring)
+   `(defonce ~(vary-meta dataset-name assoc :doc docstring, :tag `DatabaseDefinition)
       (apply dataset-definition ~(name dataset-name) ~definition))))
 
 
@@ -428,7 +429,16 @@
 
 (def ^:private edn-definitions-dir "./test/metabase/test/data/dataset_definitions/")
 
-(s/defn edn-dataset-definition :- (s/protocol IDatasetDefinition)
+(deftype ^:private EDNDatasetDefinition [dataset-name def]
+  pretty/PrettyPrintable
+  (pretty [_]
+    (list 'edn-dataset-definition dataset-name)))
+
+(defmethod get-dataset-definition EDNDatasetDefinition
+  [^EDNDatasetDefinition this]
+  @(.def this))
+
+(s/defn edn-dataset-definition
   "Define a new test dataset using the definition in an EDN file in the `test/metabase/test/data/dataset_definitions/`
   directory. (Filename should be `dataset-name` + `.edn`.)"
   [dataset-name :- su/NonBlankString]
@@ -439,15 +449,13 @@
                   (edn/read-string
                    (slurp
                     (str edn-definitions-dir dataset-name ".edn")))))]
-    (reify IDatasetDefinition
-      (get-dataset-definition [_]
-        @get-def))))
+    (EDNDatasetDefinition. dataset-name get-def)))
 
 (defmacro defdataset-edn
   "Define a new test dataset using the definition in an EDN file in the `test/metabase/test/data/dataset_definitions/`
   directory. (Filename should be `dataset-name` + `.edn`.)"
   [dataset-name & [docstring]]
-  `(def ~(vary-meta dataset-name assoc :doc docstring)
+  `(defonce ~(vary-meta dataset-name assoc :doc docstring, :tag `EDNDatasetDefinition)
      (edn-dataset-definition ~(name dataset-name))))
 
 
@@ -455,16 +463,26 @@
 ;;; |                                        Transformed Dataset Definitions                                         |
 ;;; +----------------------------------------------------------------------------------------------------------------+
 
+(deftype ^:private TransformedDatasetDefinition [new-name wrapped-definition def]
+  pretty/PrettyPrintable
+  (pretty [_]
+    (list 'transformed-dataset-definition new-name (pretty/pretty wrapped-definition))))
 
-(s/defn transformed-dataset-definition :- (s/protocol IDatasetDefinition)
+(s/defn transformed-dataset-definition
   "Create a dataset definition that is a transformation of an some other one, seqentially applying `transform-fns` to
-  it. The results of `transform-fns` are cached." {:style/indent 1}
-  [wrapped-definition :- (s/protocol IDatasetDefinition), & transform-fns :- [(s/pred fn?)]]
+  it. The results of `transform-fns` are cached."
+  {:style/indent 2}
+  [new-name wrapped-definition & transform-fns :- [(s/pred fn?)]]
   (let [transform-fn (apply comp (reverse transform-fns))
-        get-def      (delay (transform-fn (get-dataset-definition wrapped-definition)))]
-    (reify IDatasetDefinition
-      (get-dataset-definition [_]
-        @get-def))))
+        get-def      (delay
+                      (transform-fn
+                       (assoc (get-dataset-definition wrapped-definition)
+                         :database-name new-name)))]
+    (TransformedDatasetDefinition. new-name wrapped-definition get-def)))
+
+(defmethod get-dataset-definition TransformedDatasetDefinition
+  [^TransformedDatasetDefinition this]
+  @(.def this))
 
 (defn transform-dataset-update-tabledefs [f & args]
   (fn [dbdef]
@@ -559,10 +577,10 @@
           (str/replace #"s$" "")
           (str  \_ (flatten-field-name fk-dest-name))))))
 
-(s/defn flattened-dataset-definition :- (s/protocol IDatasetDefinition)
+(s/defn flattened-dataset-definition
   "Create a flattened version of `dbdef` by following resolving all FKs and flattening all rows into the table with
   `table-name`. For use with timeseries databases like Druid."
-  [dataset-definition :- (s/protocol IDatasetDefinition), table-name :- su/NonBlankString]
+  [dataset-definition, table-name :- su/NonBlankString]
   (transformed-dataset-definition dataset-definition
     (fn [dbdef]
       (assoc dbdef
