@@ -68,6 +68,7 @@
       (doseq [table (db/select (into [Table] qp.store/table-columns-to-fetch)
                       :db_id (u/get-id (qp.store/database))
                       :id    [:in table-ids-to-fetch])]
+        (println "table:" table) ; NOCOMMIT
         (qp.store/store-table! table)))))
 
 
@@ -77,7 +78,7 @@
   [pk-info :- [PKInfo]]
   (let [pk-field-ids (set (map :pk-id pk-info))
         pk-fields    (when (seq pk-field-ids)
-                       (db/select (vec (cons Field qp.store/field-columns-to-fetch)) :id [:in pk-field-ids]))]
+                       (db/select (into [Field] qp.store/field-columns-to-fetch) :id [:in pk-field-ids]))]
     (doseq [field pk-fields]
       (qp.store/store-field! field))))
 
@@ -167,6 +168,8 @@
       query
       ;; otherwise fetch PK info, add relevant Tables & Fields to QP store, and add the `:join-tables` key to the query
       (let [pk-info (fk-clauses->pk-info source-table-id fk-clauses)]
+        (println "pk-info:" pk-info) ; NOCOMMIT
+        (println "fk-clauses:" fk-clauses) ; NOCOMMIT
         (store-join-tables! fk-clauses)
         (store-join-table-pk-fields! pk-info)
         (let [resolved-join-info (resolve-join-info fk-clauses pk-info)]

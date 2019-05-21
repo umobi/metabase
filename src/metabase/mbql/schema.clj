@@ -584,7 +584,7 @@
     ;; with appropriate aliases.
     (s/optional-key :fields)       (s/cond-pre
                                     (s/enum :all :none)
-                                    (su/distinct (su/non-empty [Field])))
+                                    (su/distinct (su/non-empty [joined-field])))
     ;;
     ;; The name used to alias the joined table or query. This is usually generated automatically and generally looks
     ;; like `table__via__field`. You can specify this yourself if you need to reference a joined field in a
@@ -612,6 +612,10 @@
    #(su/empty-or-distinct? (filter some? (map :alias %)))
    "All join aliases must be unique."))
 
+(def Fields
+  "Schema for valid values of the `:fields` clause."
+  (su/distinct (su/non-empty [Field])))
+
 (def MBQLQuery
   "Schema for a valid, normalized MBQL [inner] query."
   (->
@@ -621,7 +625,7 @@
     (s/optional-key :breakout)     (su/non-empty [Field])
     ;; TODO - expressions keys should be strings; fix this when we get a chance
     (s/optional-key :expressions)  {s/Keyword FieldOrExpressionDef}
-    (s/optional-key :fields)       (su/distinct (su/non-empty [joined-field]))
+    (s/optional-key :fields)       Fields
     (s/optional-key :filter)       Filter
     (s/optional-key :limit)        su/IntGreaterThanZero
     (s/optional-key :order-by)     (su/distinct (su/non-empty [OrderBy]))
