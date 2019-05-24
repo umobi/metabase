@@ -55,13 +55,6 @@ export default class ProfileLink extends Component {
         },
       ]),
       {
-        title: t`Help`,
-        icon: null,
-        link: MetabaseSettings.docsUrl(),
-        externalLink: true,
-        event: `Navbar;Profile Dropdown;About ${tag}`,
-      },
-      {
         title: t`About Metabase`,
         icon: null,
         action: () => this.openModal("about"),

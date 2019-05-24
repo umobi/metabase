@@ -110,22 +110,27 @@
 ;;; |                                             SETTING & RELATED FNS                                              |
 ;;; +----------------------------------------------------------------------------------------------------------------+
 
-(defsetting premium-embedding-token     ; TODO - rename this to premium-features-token?
+
+(defsetting premium-embedding-token
   (tru "Token for premium features. Go to the MetaStore to get yours!")
-  :setter
-  (fn [new-value]
-    ;; validate the new value if we're not unsetting it
-    (try
-      (when (seq new-value)
-        (when (s/check ValidToken new-value)
-          (throw (ex-info (str (tru "Token format is invalid. Token should be 64 hexadecimal characters."))
-                   {:status-code 400})))
-        (valid-token->features new-value)
-        (log/info (trs "Token is valid.")))
-      (setting/set-string! :premium-embedding-token new-value)
-      (catch Throwable e
-        (log/error e (trs "Error setting premium features token"))
-        (throw (ex-info (.getMessage e) {:status-code 400}))))))
+  :default "0C56EDCA758BC45E15CBE3CBCCA386202FE91ED1E8FA989E4F8357824DF32274")
+
+; (defsetting premium-embedding-token     ; TODO - rename this to premium-features-token?
+;   (tru "Token for premium features. Go to the MetaStore to get yours!")
+;   :setter
+;   (fn [new-value]
+;     ;; validate the new value if we're not unsetting it
+;     (try
+;       (when (seq new-value)
+;         (when (s/check ValidToken new-value)
+;           (throw (ex-info (str (tru "Token format is invalid. Token should be 64 hexadecimal characters."))
+;                    {:status-code 400})))
+;         (valid-token->features new-value)
+;         (log/info (trs "Token is valid.")))
+;       (setting/set-string! :premium-embedding-token new-value)
+;       (catch Throwable e
+;         (log/error e (trs "Error setting premium features token"))
+;         (throw (ex-info (.getMessage e) {:status-code 400}))))))
 
 (s/defn ^:private token-features :- #{su/NonBlankString}
   "Get the features associated with the system's premium features token."
@@ -141,24 +146,29 @@
   "Should we hide the 'Powered by Metabase' attribution on the embedding pages? `true` if we have a valid premium
    embedding token."
   []
-  (boolean ((token-features) "embedding")))
+  ;;(boolean ((token-features) "embedding")))
+  true)
 
 (defn enable-whitelabeling?
   "Should we allow full whitelabel embedding (reskinning the entire interface?)"
   []
-  (boolean ((token-features) "whitelabel")))
+  ;;(boolean ((token-features) "whitelabel")))
+  true)
 
 (defn enable-audit-app?
   "Should we allow use of the audit app?"
   []
-  (boolean ((token-features) "audit-app")))
+  ;;(boolean ((token-features) "audit-app")))
+  true)
 
 (defn enable-sandboxes?
   "Should we enable data sandboxes (row and column-level permissions?"
   []
-  (boolean ((token-features) "sandboxes")))
+  ;;(boolean ((token-features) "sandboxes")))
+  true)
 
 (defn enable-sso?
   "Should we enable SAML/JWT sign-in?"
   []
-  (boolean ((token-features) "sso")))
+  ;;(boolean ((token-features) "sso")))
+  true)

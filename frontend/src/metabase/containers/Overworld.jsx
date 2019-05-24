@@ -211,59 +211,59 @@ class Overworld extends React.Component {
 
         <Database.ListLoader>
           {({ databases }) => {
-            if (databases.length === 0) {
+            // if (databases.length === 0) {
               return null;
-            }
-            return (
-              <Box pt={2} px={PAGE_PADDING}>
-                <SectionHeading>{t`Our data`}</SectionHeading>
-                <Box mb={4}>
-                  <Grid>
-                    {databases.map(database => (
-                      <GridItem w={[1, 1 / 3]} key={database.id}>
-                        <Link
-                          to={`browse/${database.id}`}
-                          hover={{ color: normal.blue }}
-                          data-metabase-event={`Homepage;Browse DB Clicked; DB Type ${
-                            database.engine
-                          }`}
-                        >
-                          <Box
-                            p={3}
-                            bg={colors["bg-medium"]}
-                            className="hover-parent hover--visibility"
-                          >
-                            <Icon
-                              name="database"
-                              color={normal.purple}
-                              mb={3}
-                              size={28}
-                            />
-                            <Flex align="center">
-                              <h3>{database.name}</h3>
-                              <Box ml="auto" mr={1} className="hover-child">
-                                <Flex align="center">
-                                  <Tooltip tooltip={t`Learn about this table`}>
-                                    <Link
-                                      to={`reference/databases/${database.id}`}
-                                    >
-                                      <Icon
-                                        name="reference"
-                                        color={normal.grey1}
-                                      />
-                                    </Link>
-                                  </Tooltip>
-                                </Flex>
-                              </Box>
-                            </Flex>
-                          </Box>
-                        </Link>
-                      </GridItem>
-                    ))}
-                  </Grid>
-                </Box>
-              </Box>
-            );
+            // }
+            // return (
+            //   <Box pt={2} px={PAGE_PADDING}>
+            //     <SectionHeading>{t`Our data`}</SectionHeading>
+            //     <Box mb={4}>
+            //       <Grid>
+            //         {databases.map(database => (
+            //           <GridItem w={[1, 1 / 3]} key={database.id}>
+            //             <Link
+            //               to={`browse/${database.id}`}
+            //               hover={{ color: normal.blue }}
+            //               data-metabase-event={`Homepage;Browse DB Clicked; DB Type ${
+            //                 database.engine
+            //               }`}
+            //             >
+            //               <Box
+            //                 p={3}
+            //                 bg={colors["bg-medium"]}
+            //                 className="hover-parent hover--visibility"
+            //               >
+            //                 <Icon
+            //                   name="database"
+            //                   color={normal.purple}
+            //                   mb={3}
+            //                   size={28}
+            //                 />
+            //                 <Flex align="center">
+            //                   <h3>{database.name}</h3>
+            //                   <Box ml="auto" mr={1} className="hover-child">
+            //                     <Flex align="center">
+            //                       <Tooltip tooltip={t`Learn about this table`}>
+            //                         <Link
+            //                           to={`reference/databases/${database.id}`}
+            //                         >
+            //                           <Icon
+            //                             name="reference"
+            //                             color={normal.grey1}
+            //                           />
+            //                         </Link>
+            //                       </Tooltip>
+            //                     </Flex>
+            //                   </Box>
+            //                 </Flex>
+            //               </Box>
+            //             </Link>
+            //           </GridItem>
+            //         ))}
+            //       </Grid>
+            //     </Box>
+            //   </Box>
+            // );
           }}
         </Database.ListLoader>
       </Box>
