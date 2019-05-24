@@ -113,7 +113,8 @@
 
 (defsetting premium-embedding-token
   (tru "Token for premium features. Go to the MetaStore to get yours!")
-  :default "0C56EDCA758BC45E15CBE3CBCCA386202FE91ED1E8FA989E4F8357824DF32274")
+  :default {}
+  :getter  (fn [] "0C56EDCA758BC45E15CBE3CBCCA386202FE91ED1E8FA989E4F8357824DF32274" ))
 
 ; (defsetting premium-embedding-token     ; TODO - rename this to premium-features-token?
 ;   (tru "Token for premium features. Go to the MetaStore to get yours!")
