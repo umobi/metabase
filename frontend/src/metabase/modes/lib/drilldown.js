@@ -7,7 +7,7 @@ import {
   isDate,
   isAny,
 } from "metabase/lib/schema_metadata";
-import { getFieldRefFromColumn } from "./actions";
+import { fieldRefForColumn } from "metabase/lib/dataset";
 
 import _ from "underscore";
 import { getIn } from "icepick";
@@ -161,16 +161,25 @@ function breakoutTemplatesMatchDimensions(breakoutTemplates, dimensions) {
 
 // Evaluates a breakout template, returning a completed breakout clause
 function breakoutForBreakoutTemplate(breakoutTemplate, dimensions, table) {
-  let fieldFilter = Array.isArray(breakoutTemplate)
+  const fieldFilter = Array.isArray(breakoutTemplate)
     ? breakoutTemplate[1]
     : breakoutTemplate;
-  let dimensionColumns = dimensions.map(d => d.column);
-  let field =
-    _.find(dimensionColumns, fieldFilter) || _.find(table.fields, fieldFilter);
+  const dimensionColumns = dimensions.map(d => d.column);
+  const field =
+    dimensionColumns.find(fieldFilter) ||
+    (table && table.fields.find(fieldFilter));
   if (!field) {
     return null;
   }
-  const fieldRef = getFieldRefFromColumn(dimensions[0].column, field.id);
+
+  let fieldRef = fieldRefForColumn(dimensions[0].column);
+
+  if (Array.isArray(fieldRef) && fieldRef[0] === "field-id") {
+    fieldRef = ["field-id", field.id];
+  } else if (Array.isArray(fieldRef) && fieldRef[0] === "fk->") {
+    fieldRef = ["fk->", fieldRef[1], field.id];
+  }
+
   if (Array.isArray(breakoutTemplate)) {
     const prevDimension = _.find(dimensions, dimension =>
       breakoutTemplateMatchesDimension(breakoutTemplate, dimension),
@@ -217,7 +226,7 @@ function columnToBreakout(column) {
   if (column.unit) {
     return ["datetime-field", column.id, column.unit];
   } else if (column.binning_info) {
-    let binningStrategy = column.binning_info.binning_strategy;
+    const binningStrategy = column.binning_info.binning_strategy;
 
     switch (binningStrategy) {
       case "bin-width":
@@ -245,6 +254,6 @@ function columnToBreakout(column) {
 // returns the table metadata for a dimension
 function tableForDimensions(dimensions, metadata) {
   const fieldId = getIn(dimensions, [0, "column", "id"]);
-  const field = metadata.fields[fieldId];
+  const field = metadata.field(fieldId);
   return field && field.table;
 }

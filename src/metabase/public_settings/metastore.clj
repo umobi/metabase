@@ -10,7 +10,7 @@
              [util :as u]]
             [metabase.models.setting :as setting :refer [defsetting]]
             [metabase.util
-             [i18n :refer [trs tru]]
+             [i18n :refer [deferred-tru trs tru]]
              [schema :as su]]
             [schema.core :as s]))
 
@@ -58,24 +58,24 @@
   (log/info (trs "Checking with the MetaStore to see whether {0} is valid..." token))
   (deref
    (future
-     (println (u/format-color 'green (trs "Using this URL to check token: {0}" (token-status-url token))))
+     (log/debug (u/format-color 'green (trs "Using this URL to check token: {0}" (token-status-url token))))
      (try (some-> (token-status-url token)
                   slurp
                   (json/parse-string keyword))
           ;; slurp will throw a FileNotFoundException for 404s, so in that case just return an appropriate
           ;; 'Not Found' message
           (catch java.io.FileNotFoundException e
-            {:valid false, :status (str (tru "Unable to validate token: 404 not found."))})
+            {:valid false, :status (tru "Unable to validate token: 404 not found.")})
           ;; if there was any other error fetching the token, log it and return a generic message about the
           ;; token being invalid. This message will get displayed in the Settings page in the admin panel so
           ;; we do not want something complicated
           (catch Throwable e
             (log/error e (trs "Error fetching token status:"))
-            {:valid false, :status (str (tru "There was an error checking whether this token was valid:")
+            {:valid false, :status (str (deferred-tru "There was an error checking whether this token was valid:")
                                         " "
                                         (.getMessage e))})))
    fetch-token-status-timeout-ms
-   {:valid false, :status (str (tru "Token validation timed out."))}))
+   {:valid false, :status (tru "Token validation timed out.")}))
 
 (def ^:private ^{:arglists '([token])} fetch-token-status
   "TTL-memoized version of `fetch-token-status*`. Caches API responses for 5 minutes. This is important to avoid making
@@ -110,28 +110,22 @@
 ;;; |                                             SETTING & RELATED FNS                                              |
 ;;; +----------------------------------------------------------------------------------------------------------------+
 
-
-(defsetting premium-embedding-token
-  (tru "Token for premium features. Go to the MetaStore to get yours!")
-  :default {}
-  :getter  (fn [] "0C56EDCA758BC45E15CBE3CBCCA386202FE91ED1E8FA989E4F8357824DF32274" ))
-
-; (defsetting premium-embedding-token     ; TODO - rename this to premium-features-token?
-;   (tru "Token for premium features. Go to the MetaStore to get yours!")
-;   :setter
-;   (fn [new-value]
-;     ;; validate the new value if we're not unsetting it
-;     (try
-;       (when (seq new-value)
-;         (when (s/check ValidToken new-value)
-;           (throw (ex-info (str (tru "Token format is invalid. Token should be 64 hexadecimal characters."))
-;                    {:status-code 400})))
-;         (valid-token->features new-value)
-;         (log/info (trs "Token is valid.")))
-;       (setting/set-string! :premium-embedding-token new-value)
-;       (catch Throwable e
-;         (log/error e (trs "Error setting premium features token"))
-;         (throw (ex-info (.getMessage e) {:status-code 400}))))))
+(defsetting premium-embedding-token     ; TODO - rename this to premium-features-token?
+  (deferred-tru "Token for premium features. Go to the MetaStore to get yours!")
+  :setter
+  (fn [new-value]
+    ;; validate the new value if we're not unsetting it
+    (try
+      (when (seq new-value)
+        (when (s/check ValidToken new-value)
+          (throw (ex-info (tru "Token format is invalid. Token should be 64 hexadecimal characters.")
+                   {:status-code 400})))
+        (valid-token->features new-value)
+        (log/info (trs "Token is valid.")))
+      (setting/set-string! :premium-embedding-token new-value)
+      (catch Throwable e
+        (log/error e (trs "Error setting premium features token"))
+        (throw (ex-info (.getMessage e) {:status-code 400}))))))
 
 (s/defn ^:private token-features :- #{su/NonBlankString}
   "Get the features associated with the system's premium features token."
@@ -143,33 +137,10 @@
       (log/error (trs "Error validating token:") (.getMessage e))
       #{})))
 
-(defn hide-embed-branding?
+(defsetting hide-embed-branding?
   "Should we hide the 'Powered by Metabase' attribution on the embedding pages? `true` if we have a valid premium
    embedding token."
-  []
-  ;;(boolean ((token-features) "embedding")))
-  true)
-
-(defn enable-whitelabeling?
-  "Should we allow full whitelabel embedding (reskinning the entire interface?)"
-  []
-  ;;(boolean ((token-features) "whitelabel")))
-  true)
-
-(defn enable-audit-app?
-  "Should we allow use of the audit app?"
-  []
-  ;;(boolean ((token-features) "audit-app")))
-  true)
-
-(defn enable-sandboxes?
-  "Should we enable data sandboxes (row and column-level permissions?"
-  []
-  ;;(boolean ((token-features) "sandboxes")))
-  true)
-
-(defn enable-sso?
-  "Should we enable SAML/JWT sign-in?"
-  []
-  ;;(boolean ((token-features) "sso")))
-  true)
+  :type       :boolean
+  :visibility :public
+  :setter     :none
+  :getter     (fn [] (boolean ((token-features) "embedding"))))

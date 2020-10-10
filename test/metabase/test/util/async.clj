@@ -1,7 +1,6 @@
 (ns metabase.test.util.async
   (:require [clojure.core.async :as a])
-  (:import java.io.Closeable
-           java.util.concurrent.TimeoutException))
+  (:import java.util.concurrent.TimeoutException))
 
 (defn wait-for-close
   "Wait up to `timeout-ms` for `chan` to be closed, and returns `true` once it is; otherwise throws an Exception if
@@ -17,10 +16,8 @@
       (throw (TimeoutException. "Timed out."))
 
       :else
-      (do
-        (println "Waiting for channel to close, but got unexpected result:" result)
-        (throw (ex-info "Waiting for channel to close, but got unexpected result"
-                 {:result result}))))))
+      (throw (ex-info (format "Waiting for channel to close, but got unexpected result %s" (pr-str result))
+                      {:result result})))))
 
 (defmacro with-open-channels
   "Like `with-open`, but closes core.async channels at the conclusion of `body`."
@@ -34,7 +31,6 @@
           `(do ~@body))
        (finally
          (a/close! chan#)))))
-
 
 (defmacro with-chans
   "Create core.async channels and bind them; execute body, closing out the channels in a `finally` block. Useful for
@@ -65,27 +61,3 @@
          val))
      (finally
        (a/close! chan)))))
-
-(defprotocol NotifyClosed
-  (on-close-chan [this]
-    "Returns a channel that will get a `::closed` message when `.close` is called on the object."))
-
-(defn permit
-  "Return a mocked permit object to pass to a mocked semaphore channel. You can check whether this was closed correctly
-  using `on-close-chan` above, or with `permit-closed?` below."
-  []
-  (let [closed-chan (a/promise-chan)]
-    (reify
-      Closeable
-      (close [_]
-        (a/>!! closed-chan ::closed)
-        (a/close! closed-chan))
-      NotifyClosed
-      (on-close-chan [_]
-        closed-chan))))
-
-(defn permit-closed?
-  "Wait up to 200 ms for mocked semaphore channel permit to be closed; returns true if closed or false otherwise."
-  [mocked-permit]
-  (= (wait-for-result (on-close-chan mocked-permit))
-     ::closed))

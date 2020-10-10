@@ -1,10 +1,8 @@
 import React from "react";
 import _ from "underscore";
 import mock from "xhr-mock";
-import {
-  mountWithStore,
-  fillAndSubmitForm,
-} from "__support__/integration_tests";
+import { mountWithStore } from "__support__/integration";
+import { fillAndSubmitForm } from "__support__/enzyme";
 
 import NewUserModal from "metabase/admin/people/containers/NewUserModal";
 

@@ -6,7 +6,7 @@ import { Flex } from "grid-styled";
 
 import Icon from "metabase/components/Icon";
 import Link from "metabase/components/Link";
-import ModalContent from "metabase/components/ModalContent.jsx";
+import ModalContent from "metabase/components/ModalContent";
 import DashboardPicker from "metabase/containers/DashboardPicker";
 
 import * as Urls from "metabase/lib/urls";
@@ -14,8 +14,8 @@ import * as Urls from "metabase/lib/urls";
 import type {
   Dashboard as DashboardType,
   DashboardId,
-} from "metabase/meta/types/Dashboard";
-import type { Card } from "metabase/meta/types/Card";
+} from "metabase-types/types/Dashboard";
+import type { Card } from "metabase-types/types/Card";
 
 import Dashboard from "metabase/entities/dashboards";
 

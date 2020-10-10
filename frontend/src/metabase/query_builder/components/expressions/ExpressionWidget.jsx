@@ -1,20 +1,20 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
 import cx from "classnames";
-import _ from "underscore";
 import { t } from "ttag";
-import ExpressionEditorTextfield from "./ExpressionEditorTextfield.jsx";
+import ExpressionEditorTextfield from "./ExpressionEditorTextfield";
 import { isExpression } from "metabase/lib/expressions";
 import MetabaseSettings from "metabase/lib/settings";
 
+// TODO: combine with ExpressionPopover
 export default class ExpressionWidget extends Component {
   static propTypes = {
     expression: PropTypes.array,
     name: PropTypes.string,
-    tableMetadata: PropTypes.object.isRequired,
-    onSetExpression: PropTypes.func.isRequired,
-    onRemoveExpression: PropTypes.func.isRequired,
-    onCancel: PropTypes.func.isRequired,
+    query: PropTypes.object.isRequired,
+    onChangeExpression: PropTypes.func.isRequired,
+    onRemoveExpression: PropTypes.func,
+    onClose: PropTypes.func.isRequired,
   };
 
   static defaultProps = {
@@ -35,10 +35,16 @@ export default class ExpressionWidget extends Component {
 
   isValid() {
     const { name, expression, error } = this.state;
-    return !_.isEmpty(name) && !error && isExpression(expression);
+    return !!name && !error && isExpression(expression);
   }
 
+  handleCommit = () => {
+    this.props.onChangeExpression(this.state.name, this.state.expression);
+    this.props.onClose();
+  };
+
   render() {
+    const { query } = this.props;
     const { expression } = this.state;
 
     return (
@@ -48,7 +54,7 @@ export default class ExpressionWidget extends Component {
           <div>
             <ExpressionEditorTextfield
               expression={expression}
-              tableMetadata={this.props.tableMetadata}
+              query={query}
               onChange={parsedExpression =>
                 this.setState({ expression: parsedExpression, error: null })
               }
@@ -61,8 +67,8 @@ export default class ExpressionWidget extends Component {
                 className="link"
                 target="_blank"
                 href={MetabaseSettings.docsUrl(
-                  "users-guide/04-asking-questions",
-                  "creating-a-custom-field",
+                  "users-guide/custom-questions",
+                  "creating-custom-columns",
                 )}
               >{t`Learn more`}</a>
             </p>
@@ -76,6 +82,11 @@ export default class ExpressionWidget extends Component {
               value={this.state.name}
               placeholder={t`Something nice and descriptive`}
               onChange={event => this.setState({ name: event.target.value })}
+              onKeyPress={e => {
+                if (e.key === "Enter" && this.isValid()) {
+                  this.handleCommit();
+                }
+              }}
             />
           </div>
         </div>
@@ -84,28 +95,32 @@ export default class ExpressionWidget extends Component {
           <div className="ml-auto">
             <button
               className="Button"
-              onClick={() => this.props.onCancel()}
+              onClick={() => this.props.onClose()}
             >{t`Cancel`}</button>
             <button
               className={cx("Button ml2", {
                 "Button--primary": this.isValid(),
               })}
-              onClick={() =>
-                this.props.onSetExpression(
+              onClick={() => {
+                this.props.onChangeExpression(
                   this.state.name,
                   this.state.expression,
-                )
-              }
+                );
+                this.props.onClose();
+              }}
               disabled={!this.isValid()}
             >
               {this.props.expression ? t`Update` : t`Done`}
             </button>
           </div>
           <div>
-            {this.props.expression ? (
+            {this.props.expression && this.props.onRemoveExpression ? (
               <a
                 className="pr2 ml2 text-error link"
-                onClick={() => this.props.onRemoveExpression(this.props.name)}
+                onClick={() => {
+                  this.props.onRemoveExpression(this.props.name);
+                  this.props.onClose();
+                }}
               >{t`Remove`}</a>
             ) : null}
           </div>

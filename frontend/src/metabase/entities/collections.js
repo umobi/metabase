@@ -1,7 +1,10 @@
 /* @flow */
 
 import { createEntity, undo } from "metabase/lib/entities";
-import colors from "metabase/lib/colors";
+
+import { color } from "metabase/lib/colors";
+import * as Urls from "metabase/lib/urls";
+
 import { CollectionSchema } from "metabase/schema";
 import { createSelector } from "reselect";
 
@@ -43,9 +46,7 @@ const Collections = createEntity({
 
   objectSelectors: {
     getName: collection => collection && collection.name,
-    getUrl: collection =>
-      collection &&
-      (collection.id === "root" ? `/` : `/collection/${collection.id}`),
+    getUrl: collection => Urls.collection(collection.id),
     getIcon: collection => "all",
   },
 
@@ -85,29 +86,29 @@ const Collections = createEntity({
   form: {
     fields: (
       values = {
-        color: colors.brand,
+        color: color("brand"),
       },
     ) => [
       {
         name: "name",
         title: t`Name`,
-        placeholder: "My new fantastic collection",
+        placeholder: t`My new fantastic collection`,
         validate: name =>
           (!name && t`Name is required`) ||
-          (name.length > 100 && t`Name must be 100 characters or less`),
+          (name && name.length > 100 && t`Name must be 100 characters or less`),
       },
       {
         name: "description",
         title: t`Description`,
         type: "text",
-        placeholder: "It's optional but oh, so helpful",
+        placeholder: t`It's optional but oh, so helpful`,
         normalize: description => description || null, // expected to be nil or non-empty string
       },
       {
         name: "color",
         title: t`Color`,
         type: "hidden",
-        initial: () => colors.brand,
+        initial: () => color("brand"),
         validate: color => !color && t`Color is required`,
       },
       {
@@ -194,7 +195,7 @@ type ExpandedCollection = {
 // given list of collections with { id, name, location } returns a map of ids to
 // expanded collection objects like { id, name, location, path, children }
 // including a root collection
-function getExpandedCollectionsById(
+export function getExpandedCollectionsById(
   collections: Collection[],
   userPersonalCollectionId: ?CollectionId,
 ): { [key: PseudoCollectionId]: ExpandedCollection } {

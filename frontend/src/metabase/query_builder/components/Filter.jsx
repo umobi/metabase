@@ -2,7 +2,6 @@
 
 import React from "react";
 
-import FieldName from "./FieldName.jsx";
 import Value from "metabase/components/Value";
 
 import Dimension from "metabase-lib/lib/Dimension";
@@ -13,9 +12,10 @@ import { getFilterArgumentFormatOptions } from "metabase/lib/schema_metadata";
 
 import { t, ngettext, msgid } from "ttag";
 
-import type { Filter as FilterT } from "metabase/meta/types/Query";
-import type { Value as ValueType } from "metabase/meta/types/Dataset";
+import type { Filter as FilterObject } from "metabase-types/types/Query";
+import type { Value as ValueType } from "metabase-types/types/Dataset";
 import Metadata from "metabase-lib/lib/metadata/Metadata";
+import FilterWrapper from "metabase-lib/lib/queries/structured/Filter";
 
 export type FilterRenderer = ({
   field?: ?React$Element<any>,
@@ -24,7 +24,7 @@ export type FilterRenderer = ({
 }) => React$Element<any>;
 
 type Props = {
-  filter: FilterT,
+  filter: FilterObject | FilterWrapper,
   metadata: Metadata,
   maxDisplayValues?: number,
   children?: FilterRenderer,
@@ -61,9 +61,9 @@ export const OperatorFilter = ({
   maxDisplayValues,
   children = DEFAULT_FILTER_RENDERER,
 }: Props) => {
-  let [op, field] = filter;
+  const [op, field] = filter;
   // $FlowFixMe
-  let values: ValueType[] = hasFilterOptions(filter)
+  const values: ValueType[] = hasFilterOptions(filter)
     ? filter.slice(2, -1)
     : filter.slice(2);
 
@@ -72,7 +72,7 @@ export const OperatorFilter = ({
     return null;
   }
 
-  const operator = dimension.operator(op);
+  const operator = dimension.filterOperator(op);
 
   let formattedValues;
   // $FlowFixMe: not understanding maxDisplayValues is provided by defaultProps
@@ -99,7 +99,7 @@ export const OperatorFilter = ({
       ));
   }
   return children({
-    field: <FieldName field={field} tableMetadata={dimension.field().table} />,
+    field: dimension.displayName(),
     operator: operator && operator.moreVerboseName,
     values: formattedValues,
   });

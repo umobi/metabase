@@ -14,9 +14,9 @@ import { columnSettings } from "metabase/visualizations/lib/settings/column";
 import cx from "classnames";
 import _ from "underscore";
 
-import type { VisualizationProps } from "metabase/meta/types/Visualization";
-import type { Column } from "metabase/meta/types/Dataset";
-import type { VisualizationSettings } from "metabase/meta/types/Card";
+import type { VisualizationProps } from "metabase-types/types/Visualization";
+import type { Column } from "metabase-types/types/Dataset";
+import type { VisualizationSettings } from "metabase-types/types/Card";
 
 import ScalarValue, {
   ScalarWrapper,
@@ -32,6 +32,10 @@ function legacyScalarSettingsToFormatOptions(settings) {
     .object()
     .value();
 }
+
+// used below to determine whether we show compact formatting
+const COMPACT_MAX_WIDTH = 250;
+const COMPACT_MIN_LENGTH = 6;
 
 // Scalar visualization shows a single number
 // Multiseries Scalar is transformed to a Funnel
@@ -82,7 +86,12 @@ export default class Scalar extends Component {
         },
         data: {
           cols: [
-            { base_type: TYPE.Text, display_name: t`Name`, name: "name" },
+            {
+              base_type: TYPE.Text,
+              display_name: t`Name`,
+              name: "name",
+              source: "query-transform",
+            },
             { ...s.data.cols[0] },
           ],
           rows: [[s.card.name, s.data.rows[0][0]]],
@@ -150,6 +159,7 @@ export default class Scalar extends Component {
       // title: t`Multiply by a number`,
       // widget: "number",
     },
+    click_behavior: {},
   };
 
   _getColumnIndex(cols: Column[], settings: VisualizationSettings) {
@@ -161,7 +171,7 @@ export default class Scalar extends Component {
   }
 
   render() {
-    let {
+    const {
       actionButtons,
       series: [
         {
@@ -171,13 +181,11 @@ export default class Scalar extends Component {
       ],
       isDashboard,
       onChangeCardAndRun,
-      gridSize,
       settings,
       visualizationIsClickable,
       onVisualizationClick,
+      width,
     } = this.props;
-
-    let isSmall = gridSize && gridSize.width < 4;
 
     const columnIndex = this._getColumnIndex(cols, settings);
     const value = rows[0] && rows[0][columnIndex];
@@ -190,11 +198,23 @@ export default class Scalar extends Component {
     };
 
     const fullScalarValue = formatValue(value, formatOptions);
-    const compactScalarValue = isSmall
-      ? formatValue(value, { ...formatOptions, compact: true })
-      : fullScalarValue;
+    const compactScalarValue = formatValue(value, {
+      ...formatOptions,
+      compact: true,
+    });
 
-    const clicked = { value, column };
+    // use the compact version of formatting if the component is narrower than
+    // the cutoff and the formatted value is longer than the cutoff
+    const displayCompact =
+      fullScalarValue.length > COMPACT_MIN_LENGTH && width < COMPACT_MAX_WIDTH;
+    const displayValue = displayCompact ? compactScalarValue : fullScalarValue;
+
+    const clicked = {
+      value,
+      column,
+      data: rows[0].map((value, index) => ({ value, col: cols[index] })),
+      settings,
+    };
     const isClickable = visualizationIsClickable(clicked);
 
     return (
@@ -207,7 +227,7 @@ export default class Scalar extends Component {
             "text-brand-hover cursor-pointer": isClickable,
           })}
           tooltip={fullScalarValue}
-          alwaysShowTooltip={fullScalarValue !== compactScalarValue}
+          alwaysShowTooltip={fullScalarValue !== displayValue}
           style={{ maxWidth: "100%" }}
         >
           <span
@@ -219,7 +239,7 @@ export default class Scalar extends Component {
             }
             ref={scalar => (this._scalar = scalar)}
           >
-            <ScalarValue value={compactScalarValue} />
+            <ScalarValue value={displayValue} />
           </span>
         </Ellipsified>
         {isDashboard && (

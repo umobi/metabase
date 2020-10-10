@@ -1,16 +1,24 @@
 import * as Card from "metabase/meta/Card";
 
 import { assocIn, dissoc } from "icepick";
+import { getMetadata } from "metabase/selectors/metadata";
 
 describe("metabase/meta/Card", () => {
   describe("questionUrlWithParameters", () => {
-    const metadata = {
-      fields: {
-        2: {
-          base_type: "type/Integer",
+    const metadata = getMetadata({
+      entities: {
+        databases: {},
+        schemas: {},
+        tables: {},
+        fields: {
+          2: {
+            base_type: "type/Integer",
+          },
         },
+        metrics: {},
+        segments: {},
       },
-    };
+    });
 
     const parameters = [
       {
@@ -106,7 +114,7 @@ describe("metabase/meta/Card", () => {
         {
           card_id: 1,
           parameter_id: 4,
-          target: ["dimension", ["fk->", 4, 5]],
+          target: ["dimension", ["fk->", ["field-id", 4], ["field-id", 5]]],
         },
       ];
       it("should return question URL with no parameters", () => {
@@ -164,7 +172,7 @@ describe("metabase/meta/Card", () => {
           card,
           metadata,
           parameters,
-          { "2": "123" },
+          { "2": 123 },
           parameterMappings,
         );
         expect(parseUrl(url)).toEqual({
@@ -215,7 +223,15 @@ describe("metabase/meta/Card", () => {
             ["dataset_query", "query", "filter"],
             [
               "and",
-              ["=", ["datetime-field", ["fk->", 4, 5], "month"], "2017-05-01"],
+              [
+                "=",
+                [
+                  "datetime-field",
+                  ["fk->", ["field-id", 4], ["field-id", 5]],
+                  "month",
+                ],
+                "2017-05-01",
+              ],
             ],
           ),
         });

@@ -3,18 +3,17 @@ import React, { Component } from "react";
 import PropTypes from "prop-types";
 import { connect } from "react-redux";
 import { t } from "ttag";
-import { isQueryable } from "metabase/lib/table";
 
 import S from "metabase/components/List.css";
 import R from "metabase/reference/Reference.css";
 
-import List from "metabase/components/List.jsx";
-import ListItem from "metabase/components/ListItem.jsx";
-import EmptyState from "metabase/components/EmptyState.jsx";
+import List from "metabase/components/List";
+import ListItem from "metabase/components/ListItem";
+import EmptyState from "metabase/components/EmptyState";
 
-import LoadingAndErrorWrapper from "metabase/components/LoadingAndErrorWrapper.jsx";
+import LoadingAndErrorWrapper from "metabase/components/LoadingAndErrorWrapper";
 
-import ReferenceHeader from "../components/ReferenceHeader.jsx";
+import ReferenceHeader from "../components/ReferenceHeader";
 
 import {
   getDatabase,
@@ -56,8 +55,8 @@ const createListItem = (entity, index) => (
   </li>
 );
 
-const createSchemaSeparator = entity => (
-  <li className={R.schemaSeparator}>{entity.schema}</li>
+const createSchemaSeparator = table => (
+  <li className={R.schemaSeparator}>{table.schema_name}</li>
 );
 
 export const separateTablesBySchema = (
@@ -67,9 +66,9 @@ export const separateTablesBySchema = (
 ) =>
   Object.values(tables)
     .sort((table1, table2) =>
-      table1.schema > table2.schema
+      table1.schema_name > table2.schema_name
         ? 1
-        : table1.schema === table2.schema
+        : table1.schema_name === table2.schema_name
         ? 0
         : -1,
     )
@@ -80,7 +79,7 @@ export const separateTablesBySchema = (
       // add schema header for first element and if schema is different from previous
       const previousTableId = Object.keys(sortedTables)[index - 1];
       return index === 0 ||
-        sortedTables[previousTableId].schema !== table.schema
+        sortedTables[previousTableId].schema_name !== table.schema_name
         ? [createSchemaSeparator(table), createListItem(table, index)]
         : createListItem(table, index);
     });
@@ -130,15 +129,13 @@ export default class TableList extends Component {
                         createSchemaSeparator,
                         createListItem,
                       )
-                    : Object.values(entities)
-                        .filter(isQueryable)
-                        .map(
-                          (entity, index) =>
-                            entity &&
-                            entity.id &&
-                            entity.name &&
-                            createListItem(entity, index),
-                        )}
+                    : Object.values(entities).map(
+                        (entity, index) =>
+                          entity &&
+                          entity.id &&
+                          entity.name &&
+                          createListItem(entity, index),
+                      )}
                 </List>
               </div>
             ) : (

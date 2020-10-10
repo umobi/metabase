@@ -2,7 +2,8 @@
 # STAGE 1: builder
 ###################
 
-FROM openjdk:8-jdk-alpine as builder
+# Build currently doesn't work on > Java 11 (i18n utils are busted) so build on 8 until we fix this
+FROM adoptopenjdk/openjdk8:alpine as builder
 
 WORKDIR /app/source
 
@@ -15,8 +16,9 @@ ENV LC_CTYPE en_US.UTF-8
 # yarn:  frontend building
 # make:    backend building
 # gettext: translations
+# java-cacerts: installs updated cacerts to /etc/ssl/certs/java/cacerts
 
-RUN apk add --update bash yarn git wget make gettext
+RUN apk add --update coreutils bash yarn git wget make gettext java-cacerts
 
 # lein:    backend dependencies and building
 ADD https://raw.github.com/technomancy/leiningen/stable/bin/lein /usr/local/bin/lein
@@ -39,9 +41,6 @@ ADD . .
 # build the app
 RUN bin/build
 
-# install updated cacerts to /etc/ssl/certs/java/cacerts
-RUN apk add --update java-cacerts
-
 # import AWS RDS cert into /etc/ssl/certs/java/cacerts
 ADD https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem .
 RUN keytool -noprompt -import -trustcacerts -alias aws-rds \
@@ -53,7 +52,7 @@ RUN keytool -noprompt -import -trustcacerts -alias aws-rds \
 # # STAGE 2: runner
 # ###################
 
-FROM openjdk:8-jre-alpine as runner
+FROM adoptopenjdk/openjdk11:alpine-jre as runner
 
 WORKDIR /app
 
@@ -64,7 +63,7 @@ ENV LC_CTYPE en_US.UTF-8
 RUN apk add --update bash ttf-dejavu fontconfig
 
 # add fixed cacerts
-COPY --from=builder /etc/ssl/certs/java/cacerts /usr/lib/jvm/default-jvm/jre/lib/security/cacerts
+COPY --from=builder /etc/ssl/certs/java/cacerts /opt/java/openjdk/lib/security/cacerts
 
 # add Metabase script and uberjar
 RUN mkdir -p bin target/uberjar

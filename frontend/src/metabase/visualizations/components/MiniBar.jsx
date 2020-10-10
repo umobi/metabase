@@ -1,6 +1,6 @@
 import React from "react";
 
-import colors, { alpha } from "metabase/lib/colors";
+import { color, alpha } from "metabase/lib/colors";
 import { formatValue } from "metabase/lib/formatting";
 
 const BAR_HEIGHT = 8;
@@ -14,7 +14,7 @@ const MiniBar = ({ value, extent: [min, max], options, cellHeight }) => {
   const isNegative = value < 0;
   const barPercent =
     (Math.abs(value) / Math.max(Math.abs(min), Math.abs(max))) * 100;
-  const barColor = isNegative ? colors["error"] : colors["brand"];
+  const barColor = isNegative ? color("error") : color("brand");
 
   const barStyle = !hasNegative
     ? {
@@ -47,7 +47,7 @@ const MiniBar = ({ value, extent: [min, max], options, cellHeight }) => {
         className="text-ellipsis text-bold text-right flex-full"
         style={{ minWidth: LABEL_MIN_WIDTH }}
       >
-        {formatValue(value, { ...options, jsx: true })}
+        {formatValue(value, { ...options, jsx: true, type: "cell" })}
       </div>
       {/* OUTER CONTAINER BAR */}
       <div

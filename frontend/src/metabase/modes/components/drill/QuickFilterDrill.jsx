@@ -9,12 +9,12 @@ import StructuredQuery from "metabase-lib/lib/queries/StructuredQuery";
 import type {
   ClickAction,
   ClickActionProps,
-} from "metabase/meta/types/Visualization";
+} from "metabase-types/types/Visualization";
 
 function getFiltersForColumn(column) {
   if (
     isa(column.base_type, TYPE.Number) ||
-    isa(column.base_type, TYPE.DateTime)
+    isa(column.base_type, TYPE.Temporal)
   ) {
     return [
       { name: "<", operator: "<" },
@@ -27,14 +27,17 @@ function getFiltersForColumn(column) {
   }
 }
 
-export default ({ question, clicked }: ClickActionProps): ClickAction[] => {
+export default function QuickFilterDrill({
+  question,
+  clicked,
+}: ClickActionProps): ClickAction[] {
   const query = question.query();
   if (
     !(query instanceof StructuredQuery) ||
     !clicked ||
     !clicked.column ||
     clicked.column.id == null ||
-    clicked.value == undefined
+    clicked.value === undefined
   ) {
     return [];
   }
@@ -61,11 +64,11 @@ export default ({ question, clicked }: ClickActionProps): ClickAction[] => {
     ];
   }
 
-  let operators = getFiltersForColumn(column) || [];
+  const operators = getFiltersForColumn(column) || [];
   return operators.map(({ name, operator }) => ({
     name: operator,
     section: "filter",
     title: <span className="h2">{name}</span>,
     question: () => question.filter(operator, column, value),
   }));
-};
+}

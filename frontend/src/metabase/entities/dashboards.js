@@ -9,7 +9,7 @@ import {
 
 import { createEntity, undo } from "metabase/lib/entities";
 import * as Urls from "metabase/lib/urls";
-import { normal } from "metabase/lib/colors";
+import { color } from "metabase/lib/colors";
 import { assocIn } from "icepick";
 import { t } from "ttag";
 
@@ -27,6 +27,7 @@ const COPY_ACTION = `metabase/entities/dashboards/COPY`;
 
 const Dashboards = createEntity({
   name: "dashboards",
+  nameOne: "dashboard",
   path: "/api/dashboard",
 
   displayNameOne: t`dashboard`,
@@ -132,7 +133,7 @@ const Dashboards = createEntity({
     getName: dashboard => dashboard && dashboard.name,
     getUrl: dashboard => dashboard && Urls.dashboard(dashboard.id),
     getIcon: dashboard => "dashboard",
-    getColor: () => normal.blue,
+    getColor: () => color("dashboard"),
   },
 
   form: {

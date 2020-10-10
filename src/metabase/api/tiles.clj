@@ -103,7 +103,7 @@
   (let [output-stream (ByteArrayOutputStream.)]
     (try
       (when-not (ImageIO/write tile "png" output-stream) ; returns `true` if successful -- see JavaDoc
-        (throw (Exception. (str (tru "No appropriate image writer found!")))))
+        (throw (Exception. (tru "No appropriate image writer found!"))))
       (.flush output-stream)
       (.toByteArray output-stream)
       (catch Throwable e
@@ -117,8 +117,11 @@
 ;;; ---------------------------------------------------- ENDPOINT ----------------------------------------------------
 
 ;; TODO - this can be reworked to be `defendpoint-async` instead
+;;
+;; TODO - this should reduce results from the QP in a streaming fashion instead of requiring them all to be in memory
+;; at the same time
 (api/defendpoint GET "/:zoom/:x/:y/:lat-field-id/:lon-field-id/:lat-col-idx/:lon-col-idx/"
-  "This endpoints provides an image with the appropriate pins rendered given a MBQL QUERY (passed as a GET query
+  "This endpoints provides an image with the appropriate pins rendered given a MBQL `query` (passed as a GET query
   string param). We evaluate the query and find the set of lat/lon pairs which are relevant and then render the
   appropriate ones. It's expected that to render a full map view several calls will be made to this endpoint in
   parallel."
@@ -147,13 +150,13 @@
 
         {:keys [status], {:keys [rows]} :data, :as result}
         (qp/process-query-and-save-execution! updated-query
-          {:executed-by api/*current-user-id*
-           :context     :map-tiles})
+                                              {:executed-by api/*current-user-id*
+                                               :context     :map-tiles})
 
         ;; make sure query completed successfully, or API endpoint should return 400
         _
         (when-not (= status :completed)
-          (throw (ex-info (str (tru "Query failed"))
+          (throw (ex-info (tru "Query failed")
                    ;; `result` might be a `core.async` channel or something we're not expecting
                    (assoc (when (map? result) result) :status-code 400))))
 
